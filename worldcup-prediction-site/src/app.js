@@ -45,6 +45,36 @@ function metaLabel(match) {
   return `${match.group} · ${match.matchTime || "时间待定"}`;
 }
 
+function parseMatchDate(match) {
+  const matchText = match.matchTime || "";
+  const found = /(\d{4})-(\d{2})-(\d{2})/.exec(matchText);
+  if (!found) return null;
+  return new Date(Number(found[1]), Number(found[2]) - 1, Number(found[3]));
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function availableCutoffDate(now = new Date()) {
+  const cutoff = startOfDay(now);
+  if (now.getHours() >= 18) {
+    cutoff.setDate(cutoff.getDate() + 1);
+  }
+  return cutoff;
+}
+
+function isMatchAvailable(match, now = new Date()) {
+  if (match.result?.status === "completed") return true;
+  const matchDate = parseMatchDate(match);
+  if (!matchDate) return false;
+  return matchDate <= availableCutoffDate(now);
+}
+
+function availableMatches(matches = data.matches) {
+  return matches.filter((match) => isMatchAvailable(match));
+}
+
 function formatAccuracy(stats = {}) {
   return stats.accuracy == null ? "暂无" : `${stats.accuracy}%`;
 }
@@ -183,7 +213,8 @@ function renderHero() {
 }
 
 function renderHome() {
-  const groups = [...new Set(data.matches.map((match) => match.group))];
+  const visibleMatches = availableMatches();
+  const groups = [...new Set(visibleMatches.map((match) => match.group))];
   const firstRound = data.rounds[0];
 
   app.innerHTML = `
@@ -195,13 +226,13 @@ function renderHome() {
           <p>Round Index</p>
           <h2>轮次专题</h2>
         </div>
-        <span class="badge">${data.matches.length} 场</span>
+        <span class="badge">${visibleMatches.length} 场可看</span>
       </div>
       <div class="round-scroll">
         ${groups.map((group) => `<button class="chip" type="button" data-filter-group="${escapeHtml(group)}">${escapeHtml(group)}</button>`).join("")}
       </div>
       <div id="groupMatches" class="match-list">
-        ${data.matches.slice(0, 4).map((match, index) => renderMatchCard(match, { hot: index === 0 })).join("")}
+        ${visibleMatches.slice(0, 4).map((match, index) => renderMatchCard(match, { hot: index === 0 })).join("")}
       </div>
     </section>
 
@@ -234,7 +265,7 @@ function renderHome() {
     button.addEventListener("click", () => {
       document.querySelectorAll("[data-filter-group]").forEach((item) => item.classList.remove("active"));
       button.classList.add("active");
-      const groupMatches = data.matches.filter((match) => match.group === button.dataset.filterGroup);
+      const groupMatches = visibleMatches.filter((match) => match.group === button.dataset.filterGroup);
       document.querySelector("#groupMatches").innerHTML = groupMatches.map((match) => renderMatchCard(match)).join("");
     });
   });
@@ -245,6 +276,7 @@ function renderHome() {
 }
 
 function renderMatches() {
+  const visibleMatches = availableMatches();
   app.innerHTML = `
     <section class="section">
       <div class="section-head">
@@ -252,16 +284,16 @@ function renderMatches() {
           <p>Schedule</p>
           <h2>全部比赛</h2>
         </div>
-        <span class="badge">${data.matches.length} 场预测</span>
+        <span class="badge">${visibleMatches.length} 场可看</span>
       </div>
       <input id="searchInput" class="search-box" type="search" placeholder="搜索球队、分组、推荐方向" />
       <div id="matchList" class="match-list">
-        ${data.matches.map((match) => renderMatchCard(match, { long: true })).join("")}
+        ${visibleMatches.map((match) => renderMatchCard(match, { long: true })).join("")}
       </div>
     </section>
   `;
   bindSearch("matchList", (keyword) => {
-    return data.matches.filter((match) => {
+    return visibleMatches.filter((match) => {
       const pool = `${match.group} ${match.teams.join(" ")} ${match.direction} ${match.asianLine} ${match.scorePrediction}`;
       return pool.toLowerCase().includes(keyword.toLowerCase());
     }).map((match) => renderMatchCard(match, { long: true })).join("");
@@ -295,7 +327,7 @@ function renderRound(roundId) {
     renderEmpty("还没有轮次数据");
     return;
   }
-  const matches = round.matches.map((id) => byId.get(id)).filter(Boolean);
+  const matches = availableMatches(round.matches.map((id) => byId.get(id)).filter(Boolean));
   app.innerHTML = `
     <section class="detail-hero">
       <span class="eyebrow">轮次专题</span>
@@ -403,7 +435,7 @@ function renderTeam(teamName) {
     renderEmpty("没有找到这支球队的预测记录");
     return;
   }
-  const matches = team.matches.map((id) => byId.get(id)).filter(Boolean);
+  const matches = availableMatches(team.matches.map((id) => byId.get(id)).filter(Boolean));
   app.innerHTML = `
     <section class="detail-hero">
       <span class="eyebrow">球队历史</span>
@@ -426,6 +458,10 @@ function renderMatch(matchId) {
   const match = byId.get(matchId) || data.matches[0];
   if (!match) {
     renderEmpty("还没有比赛数据");
+    return;
+  }
+  if (!isMatchAvailable(match)) {
+    renderLockedMatch(match);
     return;
   }
   const result = match.result || {};
@@ -465,6 +501,21 @@ function renderMatch(matchId) {
         ${match.teams.map((teamName) => renderTeamCard(teamByName.get(teamName))).join("")}
       </div>
     </section>
+  `;
+}
+
+function renderLockedMatch(match) {
+  app.innerHTML = `
+    <section class="detail-hero">
+      <span class="eyebrow">分析未开放</span>
+      <h1>${escapeHtml(match.teams.join(" vs "))}</h1>
+      <p class="card-summary">${escapeHtml(metaLabel(match))}</p>
+      <div class="prediction-strip">
+        <div class="metric"><span>开放规则</span><strong>每天18:00后开放明天比赛</strong></div>
+        <div class="metric"><span>当前状态</span><strong>暂未显示</strong></div>
+      </div>
+    </section>
+    ${renderDisclaimer()}
   `;
 }
 

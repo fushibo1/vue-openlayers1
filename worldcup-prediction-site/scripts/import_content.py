@@ -83,6 +83,26 @@ def load_results(project_root):
     return json.loads(results_path.read_text(encoding="utf-8"))
 
 
+def load_overrides(project_root):
+    overrides_path = project_root / "data" / "content_overrides.json"
+    if not overrides_path.exists():
+        return {}
+    return json.loads(overrides_path.read_text(encoding="utf-8"))
+
+
+def apply_text_overrides(text, override):
+    for item in override.get("removeText", []):
+        text = text.replace(item, "")
+    if override.get("asianLine"):
+        text = re.sub(
+            r"(\|\s*亚盘观点\s*\|\s*)[^|]+?(\s*\|)",
+            rf"\g<1>{override['asianLine']}\g<2>",
+            text,
+        )
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text + "\n"
+
+
 def split_handicap(handicap):
     sign = -1 if handicap < 0 else 1
     absolute = abs(handicap)
@@ -262,9 +282,9 @@ def parse_index(index_path):
     return title, description, rows
 
 
-def parse_match(path, round_name, index_row):
+def parse_match(path, round_name, index_row, override=None):
     text = path.read_text(encoding="utf-8")
-    display_text = clean_markdown(text)
+    override = override or {}
     stem = path.stem
     order = 0
     group = ""
@@ -282,8 +302,10 @@ def parse_match(path, round_name, index_row):
         teams = [item.strip() for item in re.split(r"\s+vs\s+", index_row["match"])]
 
     match_id = f"match-{order:02d}"
+    text = apply_text_overrides(text, override)
+    display_text = clean_markdown(text)
     direction = conclusion_value(text, "90分钟方向") or (index_row or {}).get("direction", "")
-    asian_line = conclusion_value(text, "亚盘观点") or (index_row or {}).get("asianLine", "")
+    asian_line = override.get("asianLine") or conclusion_value(text, "亚盘观点") or (index_row or {}).get("asianLine", "")
 
     return {
         "id": match_id,
@@ -311,6 +333,7 @@ def main():
     source_root = Path.home() / "Desktop" / SOURCE_RELATIVE
     output_path = project_root / "data" / "content.js"
     result_records = load_results(project_root)
+    content_overrides = load_overrides(project_root)
 
     matches = []
     rounds = []
@@ -327,7 +350,8 @@ def main():
         for path in sorted(round_dir.glob("*.md")):
             if path.name.startswith("00_"):
                 continue
-            match = parse_match(path, round_dir.name, index_rows.get(path.name))
+            match_id = f"match-{int(path.name.split('_', 1)[0]):02d}" if path.name[:2].isdigit() else ""
+            match = parse_match(path, round_dir.name, index_rows.get(path.name), content_overrides.get(match_id))
             match["result"] = attach_result(match, result_records.get(match["id"], {}))
             matches.append(match)
             round_match_ids.append(match["id"])
