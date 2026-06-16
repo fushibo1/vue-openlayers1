@@ -1,0 +1,14 @@
+{
+  "name": "worldcup-prediction-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import-content": "python scripts/import_content.py",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/dev.mjs --root dist --port 4173"
+  },
+  "description": "Mobile-first World Cup prediction topic site generated from Markdown content.",
+  "license": "UNLICENSED"
+}
