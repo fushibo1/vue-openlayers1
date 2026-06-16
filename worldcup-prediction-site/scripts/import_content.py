@@ -90,6 +90,13 @@ def load_overrides(project_root):
     return json.loads(overrides_path.read_text(encoding="utf-8"))
 
 
+def load_market_lines(project_root):
+    lines_path = project_root / "data" / "market_lines.json"
+    if not lines_path.exists():
+        return {}
+    return json.loads(lines_path.read_text(encoding="utf-8"))
+
+
 def apply_text_overrides(text, override):
     for item in override.get("removeText", []):
         text = text.replace(item, "")
@@ -282,9 +289,10 @@ def parse_index(index_path):
     return title, description, rows
 
 
-def parse_match(path, round_name, index_row, override=None):
+def parse_match(path, round_name, index_row, override=None, market_line=None):
     text = path.read_text(encoding="utf-8")
     override = override or {}
+    market_line = market_line or {}
     stem = path.stem
     order = 0
     group = ""
@@ -302,6 +310,8 @@ def parse_match(path, round_name, index_row, override=None):
         teams = [item.strip() for item in re.split(r"\s+vs\s+", index_row["match"])]
 
     match_id = f"match-{order:02d}"
+    if market_line.get("asianLine"):
+        override = {**override, "asianLine": market_line["asianLine"]}
     text = apply_text_overrides(text, override)
     display_text = clean_markdown(text)
     direction = conclusion_value(text, "90分钟方向") or (index_row or {}).get("direction", "")
@@ -323,6 +333,7 @@ def parse_match(path, round_name, index_row, override=None):
         "scorePrediction": conclusion_value(text, "预计比分"),
         "confidence": conclusion_value(text, "置信度"),
         "summary": section_by_keyword(text, "分析总结") or section(text, "八、分析总结", "九").strip(),
+        "marketLine": market_line,
         "fileName": path.name,
         "rawMarkdown": display_text,
     }
@@ -334,6 +345,7 @@ def main():
     output_path = project_root / "data" / "content.js"
     result_records = load_results(project_root)
     content_overrides = load_overrides(project_root)
+    market_lines = load_market_lines(project_root)
 
     matches = []
     rounds = []
@@ -351,7 +363,13 @@ def main():
             if path.name.startswith("00_"):
                 continue
             match_id = f"match-{int(path.name.split('_', 1)[0]):02d}" if path.name[:2].isdigit() else ""
-            match = parse_match(path, round_dir.name, index_rows.get(path.name), content_overrides.get(match_id))
+            match = parse_match(
+                path,
+                round_dir.name,
+                index_rows.get(path.name),
+                content_overrides.get(match_id),
+                market_lines.get(match_id),
+            )
             match["result"] = attach_result(match, result_records.get(match["id"], {}))
             matches.append(match)
             round_match_ids.append(match["id"])
