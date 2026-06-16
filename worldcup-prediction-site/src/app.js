@@ -41,16 +41,12 @@ function compactText(value = "", max = 86) {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
-function confidencePercent(match) {
-  const score = Number(match.modelScore || 64);
-  return Math.max(42, Math.min(92, Math.round(score + 10)));
-}
-
 function metaLabel(match) {
   return `${match.group} · ${match.matchTime || "时间待定"}`;
 }
 
 function renderStatusPanel() {
+  const totalRounds = data.rounds.length;
   return `
     <section class="status-panel">
       <div>
@@ -60,6 +56,14 @@ function renderStatusPanel() {
       <div>
         <span>已收录</span>
         <strong>${data.matches.length} 场 · ${data.teams.length} 队</strong>
+      </div>
+      <div>
+        <span>轮次专题</span>
+        <strong>${totalRounds} 轮</strong>
+      </div>
+      <div>
+        <span>历史预测</span>
+        <strong>${data.teams.reduce((sum, team) => sum + team.matches.length, 0)} 条球队记录</strong>
       </div>
     </section>
   `;
@@ -88,14 +92,14 @@ function renderMatchCard(match, options = {}) {
       <div class="scoreline">
         <div><span>方向</span><strong>${escapeHtml(match.direction || "-")}</strong></div>
         <div><span>比分</span><strong>${escapeHtml(match.scorePrediction || "-")}</strong></div>
-        <div><span>模型</span><strong>${escapeHtml(match.modelScore ? `${match.modelScore} 分` : "-")}</strong></div>
+        <div><span>置信</span><strong>${escapeHtml(match.confidence || "-")}</strong></div>
       </div>
     </a>
   `;
 }
 
 function renderHero() {
-  const focus = data.matches.find((match) => Number(match.modelScore) >= 65) || data.matches[0];
+  const focus = data.matches[0];
   if (!focus) {
     return `
       <section class="hero">
@@ -113,13 +117,12 @@ function renderHero() {
       <div>
         <span class="eyebrow">2026 赛前模型专题</span>
         <h1>世界杯比赛预测</h1>
-        <p>按比赛、轮次和球队组织 Markdown 素材，把关键方向、比分和风险判断做成适合手机分享的专题页。</p>
       </div>
       <div class="hero-panel">
         <a class="focus-card" href="${hashFor("match", focus.id)}">
           <div class="meta-row">
             <span>焦点场次 · ${escapeHtml(metaLabel(focus))}</span>
-            <span class="badge hot">${escapeHtml(focus.confidence || "高关注")}</span>
+            <span class="badge hot">${escapeHtml(focus.confidence || "焦点预测")}</span>
           </div>
           <div class="versus">
             <strong class="team-name">${escapeHtml(focus.teams[0])}</strong>
@@ -137,9 +140,6 @@ function renderHero() {
 }
 
 function renderHome() {
-  const hotMatches = [...data.matches]
-    .sort((a, b) => Number(b.modelScore || 0) - Number(a.modelScore || 0))
-    .slice(0, 5);
   const groups = [...new Set(data.matches.map((match) => match.group))];
   const firstRound = data.rounds[0];
 
@@ -159,19 +159,6 @@ function renderHome() {
       </div>
       <div id="groupMatches" class="match-list">
         ${data.matches.slice(0, 4).map((match, index) => renderMatchCard(match, { hot: index === 0 })).join("")}
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <div>
-          <p>Hot Board</p>
-          <h2>高关注预测</h2>
-        </div>
-        <button class="chip" type="button" data-open="matches">全部赛程</button>
-      </div>
-      <div class="match-list">
-        ${hotMatches.map((match, index) => renderMatchCard(match, { hot: index < 2 })).join("")}
       </div>
     </section>
 
@@ -290,8 +277,53 @@ function renderTeamCard(team) {
   return `
     <a class="team-card" href="${hashFor("team", team.name)}">
       <strong>${escapeHtml(team.name)}</strong>
-      <span>${escapeHtml(team.groups.join(" / "))} · ${team.matches.length} 条预测</span>
+      <span>${escapeHtml(team.groups.join(" / "))} · ${team.matches.length} 条预测 · ${escapeHtml(team.stats?.primaryDirection || "历史记录")}</span>
     </a>
+  `;
+}
+
+function renderHistoryStats(matches, team) {
+  const directions = new Map();
+  matches.forEach((match) => {
+    const direction = match.direction || "未提取";
+    directions.set(direction, (directions.get(direction) || 0) + 1);
+  });
+  const directionItems = [...directions.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+  const recent = matches.slice(-3).reverse();
+
+  return `
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <p>Archive Stats</p>
+          <h2>历史预测统计</h2>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><span>预测场次</span><strong>${matches.length}</strong></div>
+        <div class="stat-card"><span>涉及小组</span><strong>${escapeHtml(team.groups.join(" / "))}</strong></div>
+        <div class="stat-card"><span>主要方向</span><strong>${escapeHtml(directionItems[0]?.[0] || "-")}</strong></div>
+        <div class="stat-card"><span>比分样本</span><strong>${escapeHtml(team.stats?.scoreSamples?.[0] || "-")}</strong></div>
+      </div>
+      <div class="trend-list">
+        ${directionItems.map(([direction, count]) => `
+          <div>
+            <span>${escapeHtml(direction)}</span>
+            <strong>${count} 次</strong>
+          </div>
+        `).join("")}
+      </div>
+      <div class="trend-list compact">
+        ${recent.map((match) => `
+          <a href="${hashFor("match", match.id)}">
+            <span>${escapeHtml(match.teams.join(" vs "))}</span>
+            <strong>${escapeHtml(match.direction || "-")}</strong>
+          </a>
+        `).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -335,6 +367,7 @@ function renderTeam(teamName) {
         <div class="metric"><span>所属小组</span><strong>${escapeHtml(team.groups.join(" / "))}</strong></div>
       </div>
     </section>
+    ${renderHistoryStats(matches, team)}
     <section class="section">
       <div class="match-list">
         ${matches.map((match) => renderMatchCard(match, { long: true })).join("")}
@@ -361,14 +394,7 @@ function renderMatch(matchId) {
         <div class="metric"><span>90分钟方向</span><strong>${escapeHtml(match.direction || "-")}</strong></div>
         <div class="metric"><span>预计比分</span><strong>${escapeHtml(match.scorePrediction || "-")}</strong></div>
         <div class="metric"><span>大小球</span><strong>${escapeHtml(match.totalGoals || "-")}</strong></div>
-        <div class="metric"><span>风险净分</span><strong>${escapeHtml(match.riskFlag || "-")}</strong></div>
-      </div>
-      <div class="confidence">
-        <div class="meta-row">
-          <span>综合模型强度</span>
-          <strong>${escapeHtml(match.modelScore ? `${match.modelScore} 分` : "未提取")}</strong>
-        </div>
-        <div class="confidence-bar" style="--value: ${confidencePercent(match)}%"><i></i></div>
+        <div class="metric"><span>置信度</span><strong>${escapeHtml(match.confidence || "-")}</strong></div>
       </div>
     </section>
     <section class="section">

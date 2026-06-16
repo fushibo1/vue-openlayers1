@@ -25,6 +25,53 @@ def section(text, heading, next_heading):
     return match.group(1).strip() if match else ""
 
 
+def section_by_keyword(text, keyword):
+    pattern = rf"^##\s*[^\n]*{re.escape(keyword)}[^\n]*\n(.*?)(?=^##\s+|\Z)"
+    match = re.search(pattern, text, flags=re.S | re.M)
+    return match.group(1).strip() if match else ""
+
+
+def clean_markdown(text):
+    lines = text.replace("\r\n", "\n").split("\n")
+    blocked_heading_keywords = [
+        "四轴评分",
+        "综合评分",
+        "RiskFlag",
+        "资料来源",
+    ]
+    cleaned = []
+    skipping_section = False
+    skipping_rules = False
+
+    for line in lines:
+        stripped = line.strip()
+        is_heading = stripped.startswith("## ")
+
+        if is_heading:
+            skipping_section = any(keyword in stripped for keyword in blocked_heading_keywords)
+            skipping_rules = False
+            if skipping_section:
+                continue
+
+        if skipping_section:
+            continue
+
+        if stripped == "规则触发：":
+            skipping_rules = True
+            continue
+
+        if skipping_rules:
+            if stripped.startswith("- ") or stripped == "":
+                continue
+            skipping_rules = False
+
+        cleaned.append(line)
+
+    result = "\n".join(cleaned)
+    result = re.sub(r"\n{3,}", "\n\n", result).strip()
+    return result + "\n"
+
+
 def strip_ticks(value):
     return value.strip().strip("`").strip()
 
@@ -57,6 +104,7 @@ def parse_index(index_path):
 
 def parse_match(path, round_name, index_row):
     text = path.read_text(encoding="utf-8")
+    display_text = clean_markdown(text)
     stem = path.stem
     order = 0
     group = ""
@@ -92,11 +140,9 @@ def parse_match(path, round_name, index_row):
         "totalGoals": conclusion_value(text, "大小球"),
         "scorePrediction": conclusion_value(text, "预计比分"),
         "confidence": conclusion_value(text, "置信度"),
-        "modelScore": first_match(text, r"Score\s*=.*?=\s*([0-9]+(?:\.[0-9]+)?)"),
-        "riskFlag": first_match(text, r"RiskFlag净分：\*\*([+\-]?\d+)\*\*"),
-        "summary": section(text, "八、分析总结", "九").strip(),
+        "summary": section_by_keyword(text, "分析总结") or section(text, "八、分析总结", "九").strip(),
         "fileName": path.name,
-        "rawMarkdown": text,
+        "rawMarkdown": display_text,
     }
 
 
@@ -137,10 +183,30 @@ def main():
     team_map = {}
     for match in matches:
         for team in match["teams"]:
-            item = team_map.setdefault(team, {"name": team, "matches": [], "groups": []})
+            item = team_map.setdefault(
+                team,
+                {
+                    "name": team,
+                    "matches": [],
+                    "groups": [],
+                    "directions": {},
+                    "scorePredictions": [],
+                },
+            )
             item["matches"].append(match["id"])
             if match["group"] not in item["groups"]:
                 item["groups"].append(match["group"])
+            direction = match.get("direction") or "未提取"
+            item["directions"][direction] = item["directions"].get(direction, 0) + 1
+            if match.get("scorePrediction"):
+                item["scorePredictions"].append(match["scorePrediction"])
+
+    for item in team_map.values():
+        item["stats"] = {
+            "total": len(item["matches"]),
+            "primaryDirection": max(item["directions"].items(), key=lambda pair: pair[1])[0],
+            "scoreSamples": item["scorePredictions"][:3],
+        }
 
     data = {
         "generatedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

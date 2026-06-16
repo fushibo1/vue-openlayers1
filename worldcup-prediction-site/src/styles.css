@@ -570,6 +570,64 @@ button {
   font-size: 12px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-card,
+.trend-list div,
+.trend-list a {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.stat-card {
+  min-width: 0;
+  padding: 13px;
+}
+
+.stat-card span,
+.trend-list span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.stat-card strong,
+.trend-list strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.trend-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.trend-list div,
+.trend-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.trend-list.compact strong,
+.trend-list.compact span {
+  margin: 0;
+}
+
 .search-box {
   width: 100%;
   height: 44px;
