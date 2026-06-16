@@ -76,6 +76,166 @@ def strip_ticks(value):
     return value.strip().strip("`").strip()
 
 
+def load_results(project_root):
+    results_path = project_root / "data" / "results.json"
+    if not results_path.exists():
+        return {}
+    return json.loads(results_path.read_text(encoding="utf-8"))
+
+
+def split_handicap(handicap):
+    sign = -1 if handicap < 0 else 1
+    absolute = abs(handicap)
+    base = int(absolute)
+    fraction = round(absolute - base, 2)
+    if fraction == 0.25:
+        return [sign * base, sign * (base + 0.5)]
+    if fraction == 0.75:
+        return [sign * (base + 0.5), sign * (base + 1)]
+    return [handicap]
+
+
+def settle_handicap(margin, handicap):
+    outcomes = []
+    for line in split_handicap(handicap):
+        adjusted = margin + line
+        if adjusted > 0:
+            outcomes.append("win")
+        elif adjusted < 0:
+            outcomes.append("loss")
+        else:
+            outcomes.append("push")
+
+    wins = outcomes.count("win")
+    losses = outcomes.count("loss")
+    pushes = outcomes.count("push")
+
+    if wins and not losses and not pushes:
+        return "win", "正确"
+    if losses and not wins and not pushes:
+        return "loss", "错误"
+    if pushes and not wins and not losses:
+        return "push", "走水"
+    if wins and pushes:
+        return "win", "半赢"
+    if losses and pushes:
+        return "loss", "半输"
+    return "push", "走水"
+
+
+def parse_asian_pick(asian_line, teams):
+    if not asian_line:
+        return None
+
+    clauses = re.split(r"[；;]", asian_line)
+    last_team = ""
+    team_pattern = "|".join(re.escape(team) for team in sorted(teams, key=len, reverse=True))
+    if not team_pattern:
+        return None
+
+    for clause in clauses:
+        text = clause.strip()
+        team_match = re.search(team_pattern, text)
+        if team_match:
+            last_team = team_match.group(0)
+        if not last_team:
+            continue
+
+        line_match = re.search(r"([+\-]?\d+(?:\.\d+)?)", text)
+        if line_match:
+            return {
+                "team": last_team,
+                "handicap": float(line_match.group(1)),
+                "text": text,
+            }
+    return None
+
+
+def attach_result(match, result_record):
+    status = (result_record or {}).get("status", "not_started")
+    result = {
+        "status": "completed" if status == "completed" else "not_started",
+        "statusLabel": "已完赛" if status == "completed" else "未开始",
+    }
+
+    pick = parse_asian_pick(match.get("asianLine", ""), match.get("teams", []))
+    if pick:
+        result["asianPick"] = {
+            "team": pick["team"],
+            "handicap": f"{pick['handicap']:+g}" if pick["handicap"] else "0",
+            "text": pick["text"],
+        }
+
+    if status != "completed":
+        result["settlement"] = {
+            "outcome": "pending",
+            "label": "未开始",
+        }
+        return result
+
+    home_score = int(result_record.get("homeScore", 0))
+    away_score = int(result_record.get("awayScore", 0))
+    result.update(
+        {
+            "homeScore": home_score,
+            "awayScore": away_score,
+            "scoreText": f"{home_score}-{away_score}",
+            "source": result_record.get("source", ""),
+        }
+    )
+
+    if not pick:
+        result["settlement"] = {
+            "outcome": "ungraded",
+            "label": "未结算",
+        }
+        return result
+
+    teams = match.get("teams", [])
+    if pick["team"] == teams[0]:
+        margin = home_score - away_score
+    elif len(teams) > 1 and pick["team"] == teams[1]:
+        margin = away_score - home_score
+    else:
+        margin = 0
+
+    outcome, label = settle_handicap(margin, pick["handicap"])
+    result["settlement"] = {
+        "outcome": outcome,
+        "label": label,
+        "isCorrect": outcome == "win" if outcome in ("win", "loss") else None,
+    }
+    return result
+
+
+def accuracy_stats(matches):
+    completed = [match for match in matches if match.get("result", {}).get("status") == "completed"]
+    wins = [
+        match for match in completed
+        if match.get("result", {}).get("settlement", {}).get("outcome") == "win"
+    ]
+    losses = [
+        match for match in completed
+        if match.get("result", {}).get("settlement", {}).get("outcome") == "loss"
+    ]
+    pushes = [
+        match for match in completed
+        if match.get("result", {}).get("settlement", {}).get("outcome") == "push"
+    ]
+    graded = len(wins) + len(losses)
+    accuracy = round(len(wins) / graded * 100, 1) if graded else None
+    return {
+        "total": len(matches),
+        "completed": len(completed),
+        "pending": len(matches) - len(completed),
+        "graded": graded,
+        "correct": len(wins),
+        "wrong": len(losses),
+        "push": len(pushes),
+        "accuracy": accuracy,
+    }
+
+
 def parse_index(index_path):
     text = index_path.read_text(encoding="utf-8")
     rows = {}
@@ -150,6 +310,7 @@ def main():
     project_root = Path(__file__).resolve().parents[1]
     source_root = Path.home() / "Desktop" / SOURCE_RELATIVE
     output_path = project_root / "data" / "content.js"
+    result_records = load_results(project_root)
 
     matches = []
     rounds = []
@@ -167,9 +328,11 @@ def main():
             if path.name.startswith("00_"):
                 continue
             match = parse_match(path, round_dir.name, index_rows.get(path.name))
+            match["result"] = attach_result(match, result_records.get(match["id"], {}))
             matches.append(match)
             round_match_ids.append(match["id"])
 
+        round_matches = [match for match in matches if match["id"] in round_match_ids]
         rounds.append(
             {
                 "id": f"round-{len(rounds) + 1}",
@@ -177,6 +340,7 @@ def main():
                 "title": title,
                 "description": description,
                 "matches": round_match_ids,
+                "stats": accuracy_stats(round_matches),
             }
         )
 
@@ -206,11 +370,13 @@ def main():
             "total": len(item["matches"]),
             "primaryDirection": max(item["directions"].items(), key=lambda pair: pair[1])[0],
             "scoreSamples": item["scorePredictions"][:3],
+            "accuracy": accuracy_stats([match for match in matches if match["id"] in item["matches"]]),
         }
 
     data = {
         "generatedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "sourceRoot": str(source_root),
+        "stats": accuracy_stats(matches),
         "matches": matches,
         "rounds": rounds,
         "teams": sorted(team_map.values(), key=lambda item: item["name"]),

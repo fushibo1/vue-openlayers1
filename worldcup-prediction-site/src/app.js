@@ -45,6 +45,64 @@ function metaLabel(match) {
   return `${match.group} · ${match.matchTime || "时间待定"}`;
 }
 
+function formatAccuracy(stats = {}) {
+  return stats.accuracy == null ? "暂无" : `${stats.accuracy}%`;
+}
+
+function statusClass(match) {
+  return match.result?.status === "completed" ? "completed" : "pending";
+}
+
+function settlementClass(match) {
+  return match.result?.settlement?.outcome || "pending";
+}
+
+function renderStatusBadge(match) {
+  return `<span class="badge status-${statusClass(match)}">${escapeHtml(match.result?.statusLabel || "未开始")}</span>`;
+}
+
+function renderSettlementBadge(match) {
+  const result = match.result || {};
+  const label = result.settlement?.label || result.statusLabel || "未开始";
+  return `<span class="badge settlement-${settlementClass(match)}">${escapeHtml(label)}</span>`;
+}
+
+function renderAccuracyPanel(stats = data.stats, options = {}) {
+  const recentSettled = data.matches
+    .filter((match) => match.result?.status === "completed")
+    .slice(-4)
+    .reverse();
+
+  return `
+    <div class="accuracy-panel ${options.hero ? "hero-accuracy" : ""}">
+      <div class="accuracy-head">
+        <div>
+          <span class="section-kicker">历史预测统计</span>
+          <strong>${formatAccuracy(stats)}</strong>
+        </div>
+        <span class="badge settlement-win">${stats.correct || 0} 正确</span>
+      </div>
+      <div class="accuracy-grid">
+        <div><span>已完赛</span><strong>${stats.completed || 0}</strong></div>
+        <div><span>未开始</span><strong>${stats.pending || 0}</strong></div>
+        <div><span>错误</span><strong>${stats.wrong || 0}</strong></div>
+        <div><span>走水</span><strong>${stats.push || 0}</strong></div>
+      </div>
+      ${options.hero ? `
+        <div class="settled-list">
+          ${recentSettled.map((match) => `
+            <a href="${hashFor("match", match.id)}">
+              <span>${escapeHtml(match.teams.join(" vs "))}</span>
+              <strong>${escapeHtml(match.result.scoreText || "-")}</strong>
+              ${renderSettlementBadge(match)}
+            </a>
+          `).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function renderStatusPanel() {
   const totalRounds = data.rounds.length;
   return `
@@ -62,8 +120,8 @@ function renderStatusPanel() {
         <strong>${totalRounds} 轮</strong>
       </div>
       <div>
-        <span>历史预测</span>
-        <strong>${data.teams.reduce((sum, team) => sum + team.matches.length, 0)} 条球队记录</strong>
+        <span>亚盘命中率</span>
+        <strong>${formatAccuracy(data.stats)}</strong>
       </div>
     </section>
   `;
@@ -81,26 +139,27 @@ function renderDisclaimer() {
 function renderMatchCard(match, options = {}) {
   const teams = match.teams || [];
   const summary = match.summary || match.asianLine || match.direction || "";
+  const result = match.result || {};
+  const pick = result.asianPick ? `${result.asianPick.team} ${result.asianPick.handicap}` : "-";
   return `
     <a class="match-card" href="${hashFor("match", match.id)}">
       <div class="meta-row">
         <span>${escapeHtml(metaLabel(match))}</span>
-        <span class="badge ${options.hot ? "hot" : ""}">${escapeHtml(match.confidence || "模型预测")}</span>
+        ${renderStatusBadge(match)}
       </div>
       <div class="match-title">${escapeHtml(teams[0] || "")} <span class="card-kicker">vs</span> ${escapeHtml(teams[1] || "")}</div>
       <p class="card-summary">${escapeHtml(compactText(summary, options.long ? 130 : 76))}</p>
       <div class="scoreline">
-        <div><span>方向</span><strong>${escapeHtml(match.direction || "-")}</strong></div>
-        <div><span>比分</span><strong>${escapeHtml(match.scorePrediction || "-")}</strong></div>
-        <div><span>置信</span><strong>${escapeHtml(match.confidence || "-")}</strong></div>
+        <div><span>亚盘观点</span><strong>${escapeHtml(pick)}</strong></div>
+        <div><span>赛果</span><strong>${escapeHtml(result.scoreText || "未开始")}</strong></div>
+        <div><span>结算</span><strong>${renderSettlementBadge(match)}</strong></div>
       </div>
     </a>
   `;
 }
 
 function renderHero() {
-  const focus = data.matches[0];
-  if (!focus) {
+  if (!data.matches.length) {
     return `
       <section class="hero">
         <div>
@@ -118,23 +177,7 @@ function renderHero() {
         <span class="eyebrow">2026 赛前模型专题</span>
         <h1>世界杯比赛预测</h1>
       </div>
-      <div class="hero-panel">
-        <a class="focus-card" href="${hashFor("match", focus.id)}">
-          <div class="meta-row">
-            <span>焦点场次 · ${escapeHtml(metaLabel(focus))}</span>
-            <span class="badge hot">${escapeHtml(focus.confidence || "焦点预测")}</span>
-          </div>
-          <div class="versus">
-            <strong class="team-name">${escapeHtml(focus.teams[0])}</strong>
-            <span class="vs-pill">VS</span>
-            <strong class="team-name">${escapeHtml(focus.teams[1])}</strong>
-          </div>
-          <div class="prediction-strip">
-            <div class="metric"><span>90分钟方向</span><strong>${escapeHtml(focus.direction)}</strong></div>
-            <div class="metric"><span>预计比分</span><strong>${escapeHtml(focus.scorePrediction)}</strong></div>
-          </div>
-        </a>
-      </div>
+      ${renderAccuracyPanel(data.stats, { hero: true })}
     </section>
   `;
 }
@@ -238,7 +281,7 @@ function renderRounds() {
         ${data.rounds.map((round) => `
           <a class="round-card" href="${hashFor("round", round.id)}">
             <strong>${escapeHtml(round.title)}</strong>
-            <span>${escapeHtml(round.matches.length)} 场 · ${escapeHtml(compactText(round.description, 120))}</span>
+            <span>${escapeHtml(round.matches.length)} 场 · 命中率 ${formatAccuracy(round.stats)} · ${escapeHtml(compactText(round.description, 90))}</span>
           </a>
         `).join("")}
       </div>
@@ -261,8 +304,11 @@ function renderRound(roundId) {
       <div class="prediction-strip">
         <div class="metric"><span>比赛数量</span><strong>${matches.length} 场</strong></div>
         <div class="metric"><span>覆盖球队</span><strong>${new Set(matches.flatMap((match) => match.teams)).size} 支</strong></div>
+        <div class="metric"><span>已完赛</span><strong>${round.stats?.completed || 0} 场</strong></div>
+        <div class="metric"><span>亚盘命中率</span><strong>${formatAccuracy(round.stats)}</strong></div>
       </div>
     </section>
+    ${renderAccuracyPanel(round.stats)}
     ${renderDisclaimer()}
     <section class="section">
       <div class="match-list">
@@ -303,9 +349,9 @@ function renderHistoryStats(matches, team) {
       </div>
       <div class="stats-grid">
         <div class="stat-card"><span>预测场次</span><strong>${matches.length}</strong></div>
-        <div class="stat-card"><span>涉及小组</span><strong>${escapeHtml(team.groups.join(" / "))}</strong></div>
-        <div class="stat-card"><span>主要方向</span><strong>${escapeHtml(directionItems[0]?.[0] || "-")}</strong></div>
-        <div class="stat-card"><span>比分样本</span><strong>${escapeHtml(team.stats?.scoreSamples?.[0] || "-")}</strong></div>
+        <div class="stat-card"><span>已完赛</span><strong>${team.stats?.accuracy?.completed || 0}</strong></div>
+        <div class="stat-card"><span>亚盘命中率</span><strong>${formatAccuracy(team.stats?.accuracy)}</strong></div>
+        <div class="stat-card"><span>正确/错误</span><strong>${team.stats?.accuracy?.correct || 0} / ${team.stats?.accuracy?.wrong || 0}</strong></div>
       </div>
       <div class="trend-list">
         ${directionItems.map(([direction, count]) => `
@@ -382,19 +428,21 @@ function renderMatch(matchId) {
     renderEmpty("还没有比赛数据");
     return;
   }
+  const result = match.result || {};
+  const pick = result.asianPick ? `${result.asianPick.team} ${result.asianPick.handicap}` : "-";
   app.innerHTML = `
     <section class="detail-hero">
       <div class="meta-row">
         <span>${escapeHtml(metaLabel(match))}</span>
-        <span class="badge hot">${escapeHtml(match.confidence || "模型预测")}</span>
+        <span>${renderStatusBadge(match)} ${renderSettlementBadge(match)}</span>
       </div>
       <h1>${escapeHtml(match.teams[0])} vs ${escapeHtml(match.teams[1])}</h1>
       <p class="card-summary">${escapeHtml(match.venue || match.stage || "")}</p>
       <div class="detail-grid">
-        <div class="metric"><span>90分钟方向</span><strong>${escapeHtml(match.direction || "-")}</strong></div>
-        <div class="metric"><span>预计比分</span><strong>${escapeHtml(match.scorePrediction || "-")}</strong></div>
-        <div class="metric"><span>大小球</span><strong>${escapeHtml(match.totalGoals || "-")}</strong></div>
-        <div class="metric"><span>置信度</span><strong>${escapeHtml(match.confidence || "-")}</strong></div>
+        <div class="metric"><span>亚盘观点</span><strong>${escapeHtml(pick)}</strong></div>
+        <div class="metric"><span>实际赛果</span><strong>${escapeHtml(result.scoreText || "未开始")}</strong></div>
+        <div class="metric"><span>结算结果</span><strong>${renderSettlementBadge(match)}</strong></div>
+        <div class="metric"><span>预测结论</span><strong>${escapeHtml(match.asianLine || "-")}</strong></div>
       </div>
     </section>
     <section class="section">
