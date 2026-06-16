@@ -56,7 +56,7 @@ npm run preview
 
 ## 发布
 
-这个项目不依赖数据库。推荐部署到 GitHub Pages，推送代码后自动发布，不需要手工上传 zip。
+这个项目不依赖数据库。推荐部署到 Netlify，连接 GitHub 后推送代码即可自动发布，不需要手工上传 zip。
 
 构建命令：
 
@@ -69,6 +69,19 @@ npm run build
 ```text
 dist
 ```
+
+## Netlify 自动发布
+
+仓库根目录已经包含 Netlify 配置：
+
+`../netlify.toml`
+
+第一次发布时，在 Netlify 里选择 `Import an existing project`，连接 GitHub 仓库即可。  
+之后每次推送代码，Netlify 会自动运行 `npm run build` 并发布 `dist`。
+
+详细步骤见：
+
+`NETLIFY.md`
 
 ## GitHub Pages 自动发布
 
