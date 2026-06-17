@@ -58,7 +58,7 @@ function startOfDay(date) {
 
 function availableCutoffDate(now = new Date()) {
   const cutoff = startOfDay(now);
-  if (now.getHours() >= 18) {
+  if (now.getHours() >= 14) {
     cutoff.setDate(cutoff.getDate() + 1);
   }
   return cutoff;
@@ -511,7 +511,7 @@ function renderLockedMatch(match) {
       <h1>${escapeHtml(match.teams.join(" vs "))}</h1>
       <p class="card-summary">${escapeHtml(metaLabel(match))}</p>
       <div class="prediction-strip">
-        <div class="metric"><span>开放规则</span><strong>每天18:00后开放明天比赛</strong></div>
+        <div class="metric"><span>开放规则</span><strong>每天14:00后开放明天比赛</strong></div>
         <div class="metric"><span>当前状态</span><strong>暂未显示</strong></div>
       </div>
     </section>
