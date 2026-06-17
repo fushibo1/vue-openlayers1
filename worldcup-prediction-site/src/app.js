@@ -1,7 +1,9 @@
 const data = window.WORLD_CUP_DATA || { matches: [], rounds: [], teams: [] };
 const app = document.querySelector("#app");
 const navButtons = [...document.querySelectorAll("[data-nav]")];
+const backButton = document.querySelector("#backButton");
 const shareButton = document.querySelector("#shareButton");
+const routeStack = [location.hash || "#/home"];
 
 const byId = new Map(data.matches.map((match) => [match.id, match]));
 const roundById = new Map(data.rounds.map((round) => [round.id, round]));
@@ -672,6 +674,14 @@ navButtons.forEach((button) => {
   button.addEventListener("click", () => routeTo(button.dataset.nav));
 });
 
+backButton.addEventListener("click", () => {
+  if (routeStack.length > 1) {
+    history.back();
+  } else {
+    routeTo("home");
+  }
+});
+
 shareButton.addEventListener("click", async () => {
   const shareData = {
     title: document.title,
@@ -693,5 +703,17 @@ shareButton.addEventListener("click", async () => {
   }, 1200);
 });
 
-window.addEventListener("hashchange", renderRoute);
+window.addEventListener("hashchange", () => {
+  const nextHash = location.hash || "#/home";
+  const previousHash = routeStack[routeStack.length - 2];
+  const currentHash = routeStack[routeStack.length - 1];
+
+  if (nextHash === previousHash) {
+    routeStack.pop();
+  } else if (nextHash !== currentHash) {
+    routeStack.push(nextHash);
+  }
+
+  renderRoute();
+});
 renderRoute();
