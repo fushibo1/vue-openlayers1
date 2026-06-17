@@ -94,5 +94,29 @@
     "homeScore": 1,
     "awayScore": 1,
     "source": "SB Nation World Cup schedule and standings, updated 2026-06-16 10:44 UTC"
+  },
+  "match-17": {
+    "status": "completed",
+    "homeScore": 3,
+    "awayScore": 1,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-16"
+  },
+  "match-18": {
+    "status": "completed",
+    "homeScore": 1,
+    "awayScore": 4,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-16"
+  },
+  "match-19": {
+    "status": "completed",
+    "homeScore": 3,
+    "awayScore": 0,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-17"
+  },
+  "match-20": {
+    "status": "completed",
+    "homeScore": 3,
+    "awayScore": 1,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-17"
   }
 }
