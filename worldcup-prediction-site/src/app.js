@@ -4,6 +4,7 @@ const navButtons = [...document.querySelectorAll("[data-nav]")];
 const backButton = document.querySelector("#backButton");
 const shareButton = document.querySelector("#shareButton");
 const routeStack = [location.hash || "#/home"];
+const routeStates = new Map();
 
 const byId = new Map(data.matches.map((match) => [match.id, match]));
 const roundById = new Map(data.rounds.map((round) => [round.id, round]));
@@ -24,6 +25,41 @@ function hashFor(route, value = "") {
 
 function routeTo(route, value = "") {
   location.hash = hashFor(route, value);
+}
+
+function normalizeHash(hash = "") {
+  return hash || "#/home";
+}
+
+function hashFromUrl(url = "") {
+  const hashIndex = url.indexOf("#");
+  return normalizeHash(hashIndex >= 0 ? url.slice(hashIndex) : "");
+}
+
+function savePageState(hash = location.hash) {
+  const normalizedHash = normalizeHash(hash);
+  const state = {
+    ...(routeStates.get(normalizedHash) || {}),
+    scrollY: window.scrollY
+  };
+  const activeGroup = document.querySelector("[data-filter-group].active");
+  const searchInput = document.querySelector("#searchInput");
+
+  if (activeGroup) {
+    state.group = activeGroup.dataset.filterGroup;
+  }
+  if (searchInput) {
+    state.search = searchInput.value;
+  }
+
+  routeStates.set(normalizedHash, state);
+}
+
+function restorePageState(hash = location.hash) {
+  const state = routeStates.get(normalizeHash(hash));
+  requestAnimationFrame(() => {
+    scrollTo({ top: state?.scrollY || 0, behavior: "auto" });
+  });
 }
 
 function updateActiveNav(route) {
@@ -218,6 +254,11 @@ function renderHome() {
   const visibleMatches = availableMatches();
   const groups = [...new Set(visibleMatches.map((match) => match.group))];
   const firstRound = data.rounds[0];
+  const savedState = routeStates.get(normalizeHash(location.hash));
+  const selectedGroup = groups.includes(savedState?.group) ? savedState.group : "";
+  const initialMatches = selectedGroup
+    ? visibleMatches.filter((match) => match.group === selectedGroup)
+    : visibleMatches.slice(0, 4);
 
   app.innerHTML = `
     ${renderHero()}
@@ -231,10 +272,10 @@ function renderHome() {
         <span class="badge">${visibleMatches.length} 场可看</span>
       </div>
       <div class="round-scroll">
-        ${groups.map((group) => `<button class="chip" type="button" data-filter-group="${escapeHtml(group)}">${escapeHtml(group)}</button>`).join("")}
+        ${groups.map((group) => `<button class="chip ${group === selectedGroup ? "active" : ""}" type="button" data-filter-group="${escapeHtml(group)}">${escapeHtml(group)}</button>`).join("")}
       </div>
       <div id="groupMatches" class="match-list">
-        ${visibleMatches.slice(0, 4).map((match, index) => renderMatchCard(match, { hot: index === 0 })).join("")}
+        ${initialMatches.map((match, index) => renderMatchCard(match, { hot: index === 0 })).join("")}
       </div>
     </section>
 
@@ -269,6 +310,7 @@ function renderHome() {
       button.classList.add("active");
       const groupMatches = visibleMatches.filter((match) => match.group === button.dataset.filterGroup);
       document.querySelector("#groupMatches").innerHTML = groupMatches.map((match) => renderMatchCard(match)).join("");
+      savePageState();
     });
   });
 
@@ -279,6 +321,14 @@ function renderHome() {
 
 function renderMatches() {
   const visibleMatches = availableMatches();
+  const savedState = routeStates.get(normalizeHash(location.hash));
+  const initialKeyword = savedState?.search || "";
+  const initialMatches = initialKeyword
+    ? visibleMatches.filter((match) => {
+        const pool = `${match.group} ${match.teams.join(" ")} ${match.direction} ${match.asianLine} ${match.scorePrediction}`;
+        return pool.toLowerCase().includes(initialKeyword.toLowerCase());
+      })
+    : visibleMatches;
   app.innerHTML = `
     <section class="section">
       <div class="section-head">
@@ -288,9 +338,9 @@ function renderMatches() {
         </div>
         <span class="badge">${visibleMatches.length} 场可看</span>
       </div>
-      <input id="searchInput" class="search-box" type="search" placeholder="搜索球队、分组、推荐方向" />
+      <input id="searchInput" class="search-box" type="search" placeholder="搜索球队、分组、推荐方向" value="${escapeHtml(initialKeyword)}" />
       <div id="matchList" class="match-list">
-        ${visibleMatches.map((match) => renderMatchCard(match, { long: true })).join("")}
+        ${initialMatches.map((match) => renderMatchCard(match, { long: true })).join("")}
       </div>
     </section>
   `;
@@ -408,6 +458,14 @@ function renderHistoryStats(matches, team) {
 }
 
 function renderTeams() {
+  const savedState = routeStates.get(normalizeHash(location.hash));
+  const initialKeyword = savedState?.search || "";
+  const initialTeams = initialKeyword
+    ? data.teams.filter((team) => {
+        const pool = `${team.name} ${team.groups.join(" ")}`;
+        return pool.toLowerCase().includes(initialKeyword.toLowerCase());
+      })
+    : data.teams;
   app.innerHTML = `
     <section class="section">
       <div class="section-head">
@@ -417,9 +475,9 @@ function renderTeams() {
         </div>
         <span class="badge">${data.teams.length} 支球队</span>
       </div>
-      <input id="searchInput" class="search-box" type="search" placeholder="搜索球队名称或小组" />
+      <input id="searchInput" class="search-box" type="search" placeholder="搜索球队名称或小组" value="${escapeHtml(initialKeyword)}" />
       <div id="teamList" class="team-grid">
-        ${data.teams.map(renderTeamCard).join("")}
+        ${initialTeams.map(renderTeamCard).join("")}
       </div>
     </section>
   `;
@@ -527,6 +585,7 @@ function bindSearch(targetId, renderer) {
   input.addEventListener("input", () => {
     const html = renderer(input.value.trim());
     target.innerHTML = html || `<div class="empty">没有匹配结果</div>`;
+    savePageState();
   });
 }
 
@@ -652,7 +711,7 @@ function inlineMarkdown(value = "") {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
 }
 
-function renderRoute() {
+function renderRoute(options = {}) {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const route = parts[0] || "home";
   const value = parts[1] ? decodeURIComponent(parts[1]) : "";
@@ -667,7 +726,11 @@ function renderRoute() {
   else if (route === "match") renderMatch(value);
   else renderHome();
 
-  scrollTo({ top: 0, behavior: "auto" });
+  if (options.restoreState) {
+    restorePageState();
+  } else {
+    scrollTo({ top: 0, behavior: "auto" });
+  }
 }
 
 navButtons.forEach((button) => {
@@ -703,17 +766,20 @@ shareButton.addEventListener("click", async () => {
   }, 1200);
 });
 
-window.addEventListener("hashchange", () => {
+window.addEventListener("hashchange", (event) => {
+  savePageState(hashFromUrl(event.oldURL));
   const nextHash = location.hash || "#/home";
   const previousHash = routeStack[routeStack.length - 2];
   const currentHash = routeStack[routeStack.length - 1];
+  let shouldRestoreState = false;
 
   if (nextHash === previousHash) {
     routeStack.pop();
+    shouldRestoreState = true;
   } else if (nextHash !== currentHash) {
     routeStack.push(nextHash);
   }
 
-  renderRoute();
+  renderRoute({ restoreState: shouldRestoreState });
 });
 renderRoute();
