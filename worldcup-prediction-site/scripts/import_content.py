@@ -154,11 +154,31 @@ def parse_asian_pick(asian_line, teams):
     if not asian_line:
         return None
 
+    def parse_pick_from_text(text):
+        team_match = re.search(team_pattern, text)
+        if not team_match:
+            return None
+        team = team_match.group(0)
+        line_match = re.search(r"([+\-]?\d+(?:\.\d+)?)", text[team_match.end():])
+        if not line_match:
+            return None
+        return {
+            "team": team,
+            "handicap": float(line_match.group(1)),
+            "text": text.strip(),
+        }
+
     clauses = re.split(r"[；;]", asian_line)
     last_team = ""
     team_pattern = "|".join(re.escape(team) for team in sorted(teams, key=len, reverse=True))
     if not team_pattern:
         return None
+
+    for marker in ("方向", "观点", "推荐"):
+        for marker_match in re.finditer(marker, asian_line):
+            pick = parse_pick_from_text(asian_line[marker_match.end():])
+            if pick:
+                return pick
 
     for clause in clauses:
         text = clause.strip()
