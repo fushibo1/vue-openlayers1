@@ -174,7 +174,7 @@ def parse_asian_pick(asian_line, teams):
     if not team_pattern:
         return None
 
-    for marker in ("方向", "观点", "推荐"):
+    for marker in ("方向", "观点", "推荐", "偏"):
         for marker_match in re.finditer(marker, asian_line):
             pick = parse_pick_from_text(asian_line[marker_match.end():])
             if pick:

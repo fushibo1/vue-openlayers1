@@ -142,5 +142,29 @@
     "homeScore": 1,
     "awayScore": 0,
     "source": "The Guardian World Cup 2026 live report, published 2026-06-17"
+  },
+  "match-25": {
+    "status": "completed",
+    "homeScore": 1,
+    "awayScore": 1,
+    "source": "The Times World Cup 2026 day 8 live report, published 2026-06-18"
+  },
+  "match-26": {
+    "status": "completed",
+    "homeScore": 1,
+    "awayScore": 0,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-19"
+  },
+  "match-27": {
+    "status": "completed",
+    "homeScore": 4,
+    "awayScore": 1,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-18"
+  },
+  "match-28": {
+    "status": "completed",
+    "homeScore": 6,
+    "awayScore": 0,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-18"
   }
 }
