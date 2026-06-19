@@ -34,6 +34,9 @@ def section_by_keyword(text, keyword):
 def clean_markdown(text):
     lines = text.replace("\r\n", "\n").split("\n")
     blocked_heading_keywords = [
+        "当前世界杯过程质量层",
+        "前30分钟分支",
+        "PQL",
         "四轴评分",
         "综合评分",
         "RiskFlag",
@@ -56,6 +59,9 @@ def clean_markdown(text):
         if skipping_section:
             continue
 
+        if stripped.startswith("- 更新说明：") or stripped.startswith("更新说明："):
+            continue
+
         if stripped == "规则触发：":
             skipping_rules = True
             continue
@@ -68,6 +74,8 @@ def clean_markdown(text):
         cleaned.append(line)
 
     result = "\n".join(cleaned)
+    result = re.sub(r"^##\s*[一二三四五六七八九十]+、\s*预测结论\s*$", "## 四、预测结论", result, flags=re.M)
+    result = re.sub(r"^##\s*[一二三四五六七八九十]+、\s*分析总结\s*$", "## 五、分析总结", result, flags=re.M)
     result = re.sub(r"\n{3,}", "\n\n", result).strip()
     return result + "\n"
 
