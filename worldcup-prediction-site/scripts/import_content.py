@@ -162,12 +162,22 @@ def parse_asian_pick(asian_line, teams):
     if not asian_line:
         return None
 
+    aliases = {
+        "沙特阿拉伯": ["沙特"],
+        "刚果民主共和国": ["刚果民主"],
+    }
+    team_candidates = []
+    for team in teams:
+        team_candidates.append((team, team))
+        for alias in aliases.get(team, []):
+            team_candidates.append((alias, team))
+
     def parse_pick_from_text(text):
-        team_match = re.search(team_pattern, text)
-        if not team_match:
+        matched_team = match_team(text)
+        if not matched_team:
             return None
-        team = team_match.group(0)
-        line_match = re.search(r"([+\-]?\d+(?:\.\d+)?)", text[team_match.end():])
+        team, end_index = matched_team
+        line_match = re.search(r"([+\-]?\d+(?:\.\d+)?)", text[end_index:])
         if not line_match:
             return None
         return {
@@ -178,9 +188,19 @@ def parse_asian_pick(asian_line, teams):
 
     clauses = re.split(r"[；;]", asian_line)
     last_team = ""
-    team_pattern = "|".join(re.escape(team) for team in sorted(teams, key=len, reverse=True))
+    team_pattern = "|".join(re.escape(alias) for alias, _ in sorted(team_candidates, key=lambda item: len(item[0]), reverse=True))
     if not team_pattern:
         return None
+
+    def match_team(text):
+        team_match = re.search(team_pattern, text)
+        if not team_match:
+            return None
+        alias = team_match.group(0)
+        for candidate_alias, canonical_team in team_candidates:
+            if candidate_alias == alias:
+                return canonical_team, team_match.end()
+        return alias, team_match.end()
 
     for marker in ("方向", "观点", "推荐", "偏"):
         for marker_match in re.finditer(marker, asian_line):
@@ -190,9 +210,9 @@ def parse_asian_pick(asian_line, teams):
 
     for clause in clauses:
         text = clause.strip()
-        team_match = re.search(team_pattern, text)
-        if team_match:
-            last_team = team_match.group(0)
+        matched_team = match_team(text)
+        if matched_team:
+            last_team = matched_team[0]
         if not last_team:
             continue
 

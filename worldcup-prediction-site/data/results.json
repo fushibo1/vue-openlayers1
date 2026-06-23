@@ -166,5 +166,101 @@
     "homeScore": 6,
     "awayScore": 0,
     "source": "The Guardian World Cup 2026 live report, published 2026-06-18"
+  },
+  "match-29": {
+    "status": "completed",
+    "homeScore": 0,
+    "awayScore": 1,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-30": {
+    "status": "completed",
+    "homeScore": 3,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-31": {
+    "status": "completed",
+    "homeScore": 2,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-32": {
+    "status": "completed",
+    "homeScore": 0,
+    "awayScore": 1,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-33": {
+    "status": "completed",
+    "homeScore": 2,
+    "awayScore": 1,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-34": {
+    "status": "completed",
+    "homeScore": 0,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-35": {
+    "status": "completed",
+    "homeScore": 5,
+    "awayScore": 1,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-36": {
+    "status": "completed",
+    "homeScore": 0,
+    "awayScore": 4,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-37": {
+    "status": "completed",
+    "homeScore": 0,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-38": {
+    "status": "completed",
+    "homeScore": 1,
+    "awayScore": 3,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-39": {
+    "status": "completed",
+    "homeScore": 4,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-40": {
+    "status": "completed",
+    "homeScore": 2,
+    "awayScore": 2,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-41": {
+    "status": "completed",
+    "homeScore": 3,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-42": {
+    "status": "completed",
+    "homeScore": 3,
+    "awayScore": 2,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-43": {
+    "status": "completed",
+    "homeScore": 2,
+    "awayScore": 0,
+    "source": "SB Nation World Cup schedule and scores, updated 2026-06-23 02:03 UTC"
+  },
+  "match-44": {
+    "status": "completed",
+    "homeScore": 1,
+    "awayScore": 2,
+    "source": "The Guardian World Cup 2026 live report, published 2026-06-23"
   }
 }
