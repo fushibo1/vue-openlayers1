@@ -84,6 +84,13 @@ def strip_ticks(value):
     return value.strip().strip("`").strip()
 
 
+def normalize_team_name(value):
+    aliases = {
+        "沙特": "沙特阿拉伯",
+    }
+    return aliases.get(value.strip(), value.strip())
+
+
 def load_results(project_root):
     results_path = project_root / "data" / "results.json"
     if not results_path.exists():
@@ -350,12 +357,12 @@ def parse_match(path, round_name, index_row, override=None, market_line=None):
     if name_match:
         order = int(name_match.group(1))
         group = name_match.group(2)
-        teams = [item.strip() for item in name_match.group(3).split("vs")]
+        teams = [normalize_team_name(item) for item in name_match.group(3).split("vs")]
 
     if index_row:
         order = index_row["order"]
         group = index_row["group"]
-        teams = [item.strip() for item in re.split(r"\s+vs\s+", index_row["match"])]
+        teams = [normalize_team_name(item) for item in re.split(r"\s+vs\s+", index_row["match"])]
 
     match_id = f"match-{order:02d}"
     if market_line.get("asianLine"):
