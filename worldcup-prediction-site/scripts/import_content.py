@@ -304,13 +304,15 @@ def accuracy_stats(matches):
         match for match in completed
         if match.get("result", {}).get("settlement", {}).get("outcome") == "push"
     ]
-    graded = len(wins) + len(losses)
-    accuracy = round(len(wins) / graded * 100, 1) if graded else None
+    hit = len(wins) + len(pushes)
+    graded = hit + len(losses)
+    accuracy = round(hit / graded * 100, 1) if graded else None
     return {
         "total": len(matches),
         "completed": len(completed),
         "pending": len(matches) - len(completed),
         "graded": graded,
+        "hit": hit,
         "correct": len(wins),
         "wrong": len(losses),
         "push": len(pushes),

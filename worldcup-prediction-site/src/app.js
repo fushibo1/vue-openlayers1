@@ -148,7 +148,7 @@ function renderAccuracyPanel(stats = data.stats, options = {}) {
           <span class="section-kicker">历史预测统计</span>
           <strong>${formatAccuracy(stats)}</strong>
         </div>
-        <span class="badge settlement-win">${stats.correct || 0} 正确</span>
+        <span class="badge settlement-win">${stats.hit ?? stats.correct ?? 0} 命中</span>
       </div>
       <div class="accuracy-grid">
         <div><span>已完赛</span><strong>${stats.completed || 0}</strong></div>
