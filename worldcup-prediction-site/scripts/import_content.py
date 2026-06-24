@@ -394,6 +394,17 @@ def parse_match(path, round_name, index_row, override=None, market_line=None):
     }
 
 
+def round_sort_key(round_dir):
+    orders = []
+    for path in round_dir.glob("*.md"):
+        if path.name.startswith("00_"):
+            continue
+        prefix = path.name.split("_", 1)[0]
+        if prefix.isdigit():
+            orders.append(int(prefix))
+    return min(orders) if orders else 9999
+
+
 def main():
     project_root = Path(__file__).resolve().parents[1]
     source_root = Path.home() / "Desktop" / SOURCE_RELATIVE
@@ -405,7 +416,7 @@ def main():
     matches = []
     rounds = []
 
-    for round_dir in sorted([item for item in source_root.iterdir() if item.is_dir()]):
+    for round_dir in sorted([item for item in source_root.iterdir() if item.is_dir()], key=round_sort_key):
         index_files = sorted(round_dir.glob("00_*.md"))
         title = round_dir.name
         description = ""
